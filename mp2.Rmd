@@ -5,6 +5,7 @@ date: "October 31, 2017"
 output: html_document
 ---
 
+<!-- GitHub Steps: Pull, Stage, Commit, Push -->
 
 ## Loading the data
 
@@ -16,3 +17,34 @@ load("candidates.rda")
 load("committees.rda")
 load("contributions.rda")
 ```
+
+
+```{r}
+library(tidyverse)
+glimpse(house_elections)
+```
+
+```{r}
+glimpse(candidates)
+```
+
+```{r}
+glimpse(committees)
+```
+
+```{r}
+glimpse(contributions)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
