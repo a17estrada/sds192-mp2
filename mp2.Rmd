@@ -157,7 +157,7 @@ dup_fun2012 <- function(name){
 lapply(d, dup_fun2012)
 ```
 -->
-
+ 
 
 
 
