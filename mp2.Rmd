@@ -114,19 +114,49 @@ any(duplicated(pres2012$cand_name))
 any(duplicated(house2012$cand_name))
 any(duplicated(sen2012$cand_name))
 ```
-
+ 
 ```{r}
 # Check the duplicate in house2012
-house2012$cand_name[duplicated(house2012$cand_name)] 
+d <- house2012$cand_name[duplicated(house2012$cand_name)] 
+d
 ```
 
 ```{r}
 hancock <- house2012 %>%
   filter(cand_name == "HANCOCK, DAVID")
+
 ```
 
+```{r}
+dupes <- house2012 %>%
+  filter(cand_name == "HANCOCK, DAVID" |
+           cand_name == "AVERSA, ALAN" |
+           cand_name == "BIBBS, JAMES" |
+           cand_name == "LEWIS, DAVID" |
+           cand_name == "FOSTER, JAMES" |
+           cand_name == "SANCHEZ, DAVID" | 
+           cand_name == "BRODHEAD, STEPHAN ANDREW" |
+           cand_name == "HATHCOX, VALINDA")
 
+dupes <- dupes %>%
+  arrange(cand_name)
 
+```
+
+<!-- IGNORE (TRIED MAKING A FUNCTION INSTEAD OF MANUALLY CODING ABOVE)
+```{r}
+# Create duplicate function
+dup_fun2012 <- function(name){
+  house2012 %>%
+  filter(cand_name == name)
+}
+```
+
+```{r}
+# Use lapply
+lapply(d, dup_fun2012)
+```
+-->
 
 
 
