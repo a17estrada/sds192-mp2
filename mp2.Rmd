@@ -36,11 +36,94 @@ glimpse(committees)
 glimpse(contributions)
 ```
 
+<!-- SKIP THIS
+```{r}
+# Create candidates data set for only year 2011
+can2011 <- candidates %>%
+  filter(cand_election_yr == 2011)
+
+# Repeat for year 2012
+can2012 <- candidates %>%
+  filter(cand_election_yr == 2012)
+
+```
+
+```{r}
+# Check for duplicated candidates in `can2011`
+any(duplicated(can2011$cand_name))
+
+# Check for duplicated candidates in `can2012`
+any(duplicated(can2012$cand_name))
+
+```
+-->
+
+## FOR YEAR 2011
+```{r}
+# Find number of candidates who ran for P,H,S
+can_num2011 <- candidates %>%
+  filter(cand_election_yr == 2011) %>%
+  group_by(cand_office) %>%
+  summarise(num = n())
+can_num2011
+```
+
+```{r}
+# Create dataset of candidates who ran for President
+pres2011 <- candidates %>%
+  filter(cand_election_yr == 2011 & cand_office == "P") 
+
+# Create dataset of candidates who ran for House
+house2011 <- candidates %>%
+  filter(cand_election_yr == 2011 & cand_office == "H") 
+ 
+# Check duplicates
+any(duplicated(pres2011$cand_name))
+any(duplicated(house2011$cand_name))
+
+```
+
+## FOR YEAR 2012
+
+```{r}
+# Find number of candidates who ran for P,H,S
+can_num2012 <- candidates %>%
+  filter(cand_election_yr == 2012) %>%
+  group_by(cand_office) %>%
+  summarise(num = n())
+can_num2012
+```
 
 
+```{r}
 
+# Create dataset of candidates who ran for President
+pres2012 <- candidates %>%
+  filter(cand_election_yr == 2012 & cand_office == "P") 
+ 
+# Create dataset of candidates who ran for House
+house2012 <- candidates %>%
+  filter(cand_election_yr == 2012 & cand_office == "H") 
+ 
+# Create dataset of candidates who ran for Senate
+sen2012 <- candidates %>%
+  filter(cand_election_yr == 2012 & cand_office == "S") 
+ 
+# Check duplicates
+any(duplicated(pres2012$cand_name))
+any(duplicated(house2012$cand_name))
+any(duplicated(sen2012$cand_name))
+```
 
+```{r}
+# Check the duplicate in house2012
+house2012$cand_name[duplicated(house2012$cand_name)] 
+```
 
+```{r}
+hancock <- house2012 %>%
+  filter(cand_name == "HANCOCK, DAVID")
+```
 
 
 
