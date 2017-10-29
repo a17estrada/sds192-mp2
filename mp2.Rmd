@@ -158,6 +158,83 @@ lapply(d, dup_fun2012)
 ```
 --> 
  
+ Clean up of data, only include 2012? 
+ 
+```{r}
+cleancontributions <- contributions %>%
+  select(cmte_id, name, city, state, zip_code, transaction_amt, cand_id, tran_id) 
+cleancandidates <- candidates %>%
+  filter( cand_election_yr == 2012, cand_status == "C") %>%
+  select(cand_id, cand_name, cand_party_affiliation, cand_election_yr, cand_office_state, cand_office, cand_status, cand_city, cand_state, cand_zip)
+```
 
+Join the two datasets by cand_id:
+
+```{r}
+candcontjoin <- cleancontributions %>%
+  full_join( cleancandidates, by = "cand_id") %>%
+  filter( cand_party_affiliation == "DEM" | cand_party_affiliation == "REP")
+```
+
+
+Then add the committee name based off of Committee ID:
+```{r}
+committeename <- committees %>%
+  select(cmte_id, cmte_name)
+```
+
+```{r}
+committeecontributionlist <- candcontjoin %>%
+  full_join( committeename, by = "cmte_id")
+```
+
+
+Group by number of donations to each committee:
+
+```{r}
+committeegroup <- committeecontributionlist %>%
+  group_by( cmte_name ) %>%
+  summarize( countofcontributions = n(), totaltransaction = sum(transaction_amt))
+committeegroup[is.na(committeegroup)] <- 0
+```
+
+```{r}
+demcommittee <- committeecontributionlist %>%
+  filter(cand_party_affiliation == "DEM") %>%
+  group_by(cmte_name)%>%
+  summarize( countofdem = n())
+```
+
+```{r}
+repcommittee <- committeecontributionlist %>%
+  filter(cand_party_affiliation == "REP") %>%
+  group_by(cmte_name)%>%
+  summarize( countofrep = n())
+```
+
+
+```{r}
+committeebyparty <- demcommittee %>%
+  full_join( repcommittee, by = "cmte_name") 
+committeebyparty[is.na(committeebyparty)] <- 0
+```
+
+Check to make sure the joining is working properly:
+
+```{r}
+committeebypartycheck <-committeebyparty %>%
+  full_join( committeegroup, by = "cmte_name") %>%
+  mutate( check = countofcontributions - (countofdem + countofrep)) 
+```
+
+
+Find the percent of total donors that were either Rep or Dem:
+
+```{r}
+committeebypartyfinal <-committeebyparty %>%
+  full_join( committeegroup, by = "cmte_name") %>%
+  mutate( percentdem = (countofdem / countofcontributions) * 100) %>%
+  mutate( pecentrep = (countofrep / countofcontributions) * 100) 
+```
 
 
