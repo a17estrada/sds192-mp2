@@ -163,6 +163,298 @@ p
 ``` 
 
 
+<!------------- Committees by Candidate Office -------------------->
+
+```{r include=FALSE}
+#library(tidyverse)
+#library(ggplot2)
+library(ggthemes)
+#library(plotly)
+#packageVersion('plotly')
+```
+
+<!-- Join Contributions to Candidates -->
+```{r include=FALSE}
+con_can <- inner_join(contributions, candidates, by = "cand_id")
+```
+
+<!-- Columns to keep: -->
+<!-- cmte_id, name, state, transaction_amt, cand_id, cand_name, cand_party_affiliation, cand_election_yr, cand_office_state, cand_office, cand_status, cand_state -->
+
+```{r include=FALSE}
+# Filter for only Democrats and Republicans who are currently running and with 24K transaction type to account for nonaffiliated committees
+DR <- con_can %>%
+  filter((cand_party_affiliation == "DEM" |
+           cand_party_affiliation == "REP"),
+           cand_status == "C",
+           transaction_type == "24K") %>% 
+  select(cmte_id, name, state, transaction_amt,
+         cand_id, cand_name, cand_party_affiliation,
+         cand_election_yr, cand_office_state,
+         cand_office, cand_status, cand_state) %>%
+    mutate(cand_party_affiliation = ifelse(cand_party_affiliation == "DEM",
+                                           "Democratic", cand_party_affiliation),
+           cand_party_affiliation = ifelse(cand_party_affiliation == "REP",
+                                           "Republican", cand_party_affiliation),
+           cand_office = ifelse(cand_office == "H", "House", cand_office),
+           cand_office = ifelse(cand_office == "P", "President", cand_office),
+           cand_office = ifelse(cand_office == "S", "Senate", cand_office))
+
+# Remove rows with missing values for cmte_id (had to use this with full_join)
+#DR <- DR %>%
+#  filter(cmte_id != is.na(cmte_id))
+
+```
+
+
+<!-- Join committee names and DR  -->
+```{r include=FALSE}
+com_names <- committees %>%
+  select(cmte_id, cmte_name)
+
+DR <- inner_join(com_names, DR, by = "cmte_id")
+```
+
+<!-- Consider only year 2012 -->
+```{r include=FALSE}
+DR_2012 <- DR %>%
+  filter(cand_election_yr == 2012)
+```
+
+<!-- Total donors per committee regardless if Dem or Rep: -->
+```{r include=FALSE}
+D_total2012 <- DR_2012 %>%
+  group_by(cmte_id) %>%
+  summarize(num_donor = n(), trans_amt = sum(transaction_amt))
+```
+
+<!-- Separate into Democrats and Republicans for 2012 -->
+```{r include=FALSE}
+D_2012 <- DR_2012 %>%
+  filter(cand_party_affiliation == "Democratic") 
+
+R_2012 <- DR_2012 %>%
+  filter(cand_party_affiliation == "Republican") 
+
+```
+
+
+<!-- Create a function to count: -->
+<!-- - the number of donors who made contributions to a committee within each office: President, House, Senate -->
+<!-- - the number of donors who made contributions towards (or against, this is unknown) a candidate within each office: President, House, Senate -->
+
+```{r include=FALSE}
+# This function outputs a dataframe 
+# df = D_2012 OR R_2012
+# office = "President"  OR  "House"  OR  "Senate"
+# c = "cmte" OR "cand"
+
+ccFUN <- function(df, office, c){
+  newdf <- df %>%
+    filter(cand_office == office)
+  
+
+  # By committee
+  if(c == "cmte"){
+    by_c <- newdf %>%
+    group_by(cmte_id) %>%
+    summarize(num_donor = n(), 
+            trans_amt = sum(transaction_amt))
+    by_c <- inner_join(com_names, by_c)
+  }
+  
+  # By candidate
+  else if(c == "cand"){
+    by_c <- newdf %>%
+    group_by(cand_name) %>%
+    summarize(num_donor = n(), 
+            trans_amt = sum(transaction_amt),
+            cand_office = office)
+    }
+  
+  return(by_c)
+}
+
+```
+
+<!-- Run Function according to office each for Dem and Rep  -->
+```{r include=FALSE}
+D12p_cmte <- ccFUN(D_2012, "President", "cmte")
+D12p_cand <- ccFUN(D_2012, "President", "cand")
+
+D12h_cmte <- ccFUN(D_2012, "House", "cmte")
+D12h_cand <- ccFUN(D_2012, "House", "cand")
+
+D12s_cmte <- ccFUN(D_2012, "Senate", "cmte")
+D12s_cand <- ccFUN(D_2012, "Senate", "cand")
+
+R12p_cmte <- ccFUN(R_2012, "President", "cmte")
+R12p_cand <- ccFUN(R_2012, "President", "cand")
+
+R12h_cmte <- ccFUN(R_2012, "House", "cmte")
+R12h_cand <- ccFUN(R_2012, "House", "cand")
+
+R12s_cmte <- ccFUN(R_2012, "Senate", "cmte")
+R12s_cand <- ccFUN(R_2012, "Senate", "cand")
+
+```
+
+<!-- Create Function to Join Dem and Rep committee dataframes -->
+```{r include=FALSE}
+# Arguments:
+  # df1 = D12p_cmte OR D12h_cmte OR D12s_cmte
+  # df2 = R12p_cmte OR R12h_cmte OR R12s_cmte
+  # office = "P", "H", "S" (must correspond to df1 and df2)
+# In Output:
+  # x = Democrat, y = Republican
+
+DR_idFUN <- function(df1, df2, office){
+  df <- full_join(df1, df2, by = "cmte_id")
+  
+  dfnew <- df %>%
+      mutate(cmte_name = ifelse(is.na(cmte_name.x),
+                                cmte_name.y, cmte_name.x))
+  
+  dfnew <- dfnew %>%
+    select(-cmte_name.x, -cmte_name.y) %>%
+    select(cmte_id, cmte_name, num_donor.x:trans_amt.y) %>%
+    mutate(num_donor.x = ifelse(is.na(num_donor.x),
+                                      0, num_donor.x),
+           num_donor.y = ifelse(is.na(num_donor.y),
+                                      0, num_donor.y),
+           trans_amt.x = ifelse(is.na(trans_amt.x),
+                                      0, trans_amt.x),
+           trans_amt.y = ifelse(is.na(trans_amt.y),
+                                      0, trans_amt.y),
+           cand_office = office)
+  
+  dfnew <- dfnew %>%
+    mutate(major_party = ifelse(num_donor.x > num_donor.y,
+                                "Democratic", "Republican")) %>%
+    mutate(major_party = ifelse(num_donor.x == num_donor.y,
+                                "Neutral", major_party))
+  
+  return(dfnew)         
+}
+
+```
+
+<!-- Run Function to join Dem and Rep -->
+```{r include=FALSE}
+DRp <- DR_idFUN(D12p_cmte, R12p_cmte, "President")
+DRh <- DR_idFUN(D12h_cmte, R12h_cmte, "House")
+DRs <- DR_idFUN(D12s_cmte, R12s_cmte, "Senate")
+```
+
+<!-- Create Function to Summarize majority of conrtibutions by political party -->
+```{r include=FALSE}
+# Arguments:
+  # df = DRp, DRh, DRs
+  # office = "P", "H", "S" (must correspond to df)
+
+summaryFUN <- function(df, office){
+  
+  d <- df %>%
+  group_by(major_party) %>%
+  summarise(num_committees = n()) 
+  
+  d <- d %>%
+  mutate(cand_office = office)
+  
+  return(d)
+}
+```
+
+<!-- Run summaryFUN to see majority of contributions by party -->
+```{r include=FALSE}
+h <- summaryFUN(DRh, "House")
+p <- summaryFUN(DRp, "President")
+s <- summaryFUN(DRs, "Senate") 
+```
+
+<!-- Create Function to Add Percentages column to `h` `p` and `s` -->
+```{r include=FALSE}
+# Arguments:
+  # df = h, p, s
+
+percFUN <- function(df){
+
+   df %>%
+    mutate(Proportion = num_committees/sum(num_committees)) %>%
+    mutate(Percent = round(100*(num_committees/sum(num_committees)), 1))
+  }
+
+```
+
+<!-- Run function above to add percentages -->
+```{r include=FALSE}
+h <- percFUN(h)
+p <- percFUN(p)
+s <- percFUN(s)
+```
+
+<!-- Join dataframes `h`, `p`, and `s` by binding rows -->
+```{r include=FALSE}
+com_count <- bind_rows(h,p)
+com_count <- bind_rows(com_count, s)
+```
+
+<!-- Add column to `com_count` with the number of candidates running -->
+```{r include=FALSE}
+dh <- nrow(D12h_cand)
+nh <- 0
+rh <- nrow(R12h_cand)
+dp <- nrow(D12p_cand)
+rp <- nrow(R12p_cand)
+ds <- nrow(D12s_cand)
+ns <- 0
+rs <- nrow(R12s_cand)
+
+num_cand <- c(dh, nh, rh, dp, rp, ds, ns, rs)
+
+com_count <- com_count %>%
+  mutate(num_cand = num_cand)
+```
+
+<!-- Rename Variable names -->
+```{r include=FALSE}
+com_count <- com_count %>%
+  rename(Party = major_party, Office = cand_office)
+```
+
+
+We further explored the percentage of committees whose contributions tends towards Democrats, Republicans, and Neutral. Note that in the year 2012, committees contributing to the presidential race were primarily Republican. However, this is not an predictor of election results since former President Barack Obama was a Democrat. The effect of committee contributions and its effect on election results could be further explored.
+
+<!-- Stacked bar plot of percentage of committees whose contributions tends towards Democrats, Republicans, and Neutral -->
+```{r echo=FALSE}
+graph <- ggplot(com_count, aes(x=Office, y=Percent, fill=Party)) +
+  geom_bar(stat = "identity", width = 0.4) +
+  scale_fill_manual(values = c("royalblue4","darkseagreen3","firebrick")) +
+  theme_minimal() +
+  theme(legend.position="bottom", 
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        legend.title=element_blank()) +
+  scale_y_continuous(labels = function(Percent){ paste0(Percent, "%") }) +
+        #labs(title = "Bipartisan Committee Contributions By Office")
+  ggtitle("Bipartisan Committee Contributions By Office") 
+  
+
+#graph
+  
+ggplotly(graph) %>%
+  layout(title = "Bipartisan Committee Contributions By Office",
+         legend = list(orientation = "h",
+                   y = -0.15, x = 0.24))
+   
+```
+
+
+
+
+
+
+
 
 <!---Coding Sources:
 https://stat.ethz.ch/R-manual/R-devel/library/base/html/chartr.html
@@ -172,6 +464,7 @@ https://stackoverflow.com/questions/35090883/remove-all-of-x-axis-labels-in-ggpl
 https://stackoverflow.com/questions/24256044/comma-separated-string-to-list-in-r
 https://stackoverflow.com/questions/6693257/making-a-stacked-bar-plot-for-multiple-variables-ggplot2-in-r
 --->
+
 
 
 
