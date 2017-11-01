@@ -102,11 +102,11 @@ committeebypartycheck <-committeebyparty %>%
 ```{r, include=FALSE}
 committeebypartyfinal <-committeebyparty %>%
   full_join( committeegroup, by = "cmte_name") %>%
-  mutate( Democratic = (countofdem / countofcontributions) * 100) %>%
-  mutate( Republican = (countofrep / countofcontributions) * 100) %>%
+  mutate( Democratic = round(((countofdem / countofcontributions) * 100), digits =2)) %>%
+  mutate( Republican = round(((countofrep / countofcontributions) * 100), digits =2)) %>%
   mutate( party = ifelse( Democratic > Republican, "D", "R")) %>%
   mutate( party = ifelse( Democratic == Republican, "Neutral", party)) %>%
-  mutate( totalperc = Democratic + Republican) %>%
+  mutate( totalperc = round((Democratic + Republican), digits = 2)) %>%
   rename( CommitteeName = cmte_name)
 ```
 
@@ -153,13 +153,13 @@ mlargestcommittee <- mlargestcommittee %>%
   rename(Percent = value)
 p <- ggplot(mlargestcommittee, aes( x= Committee, Percent, fill = Party)) +
   geom_bar(position = "fill", stat = "identity") +
-  scale_fill_manual(values=c("firebrick","royalblue4"),
-                    name="Party\nAffliation") +
+  scale_fill_manual(values=c("firebrick","royalblue4")) +  
   scale_y_continuous(labels = percent) +
-  theme(axis.text.x=element_blank()) +
-  labs(title= "Party Affiliation of Largest US Committees", y ="Percentage", x = "Top 10 Largest Committees")
+  theme_minimal()+
+  theme(axis.text.x=element_blank(), legend.title = element_blank()) +
+  labs(title= "Party Affiliation of Largest US Committees", y ="Percent", x = "Top 10 Largest Committees")
 p <- ggplotly(p)
-p
+p 
 ``` 
 
 
