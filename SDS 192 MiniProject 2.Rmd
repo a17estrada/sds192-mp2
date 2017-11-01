@@ -1,0 +1,185 @@
+---
+title: "SDS 192: Mini Project 2"
+author: "Angelica Estrada & Natalia Kreciglowa"
+date: "10/31/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+<!-- GitHub Steps: Pull, Stage, Commit, Push 
+Loading the data
+This project is so interesting and relevant to my life!-->
+```{r, include=FALSE}
+load("house_elections.rda")
+load("candidates.rda")
+load("committees.rda")
+load("contributions.rda")
+```
+
+```{r, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(plotly)
+packageVersion('plotly')
+library(scales)
+library(reshape2)
+```
+
+
+<!--Clean up of data, only include 2012, contributions that were directly to a committee (24K), and for current candidate (status = C)-->
+```{r,include=FALSE}
+cleancontributions <- contributions %>%
+  select(cmte_id, name, city, state, zip_code, transaction_amt, cand_id, tran_id, transaction_type) %>%
+  filter( transaction_type == "24K")
+cleancandidates <- candidates %>%
+  filter( cand_election_yr == 2012, cand_status == "C") %>%
+  select(cand_id, cand_name, cand_party_affiliation, cand_election_yr, cand_office_state, cand_office, cand_status, cand_city, cand_state, cand_zip)
+```
+
+<!--Join the contributions to candidates by cand_id to match the contributions going to each candidate, filter out only to include Democrats or Republicans:-->
+```{r, include=FALSE}
+candcontjoin <- cleancontributions %>%
+  full_join( cleancandidates, by = "cand_id") %>%
+  filter( cand_party_affiliation == "DEM" | cand_party_affiliation == "REP")
+```
+
+<!--Then, create a file with just committee names and committee IDs:-->
+```{r, include=FALSE}
+committeename <- committees %>%
+  select(cmte_id, cmte_name)
+```
+
+<!--Left join the committee names to the candidates and contributions, to track each contribution for each candidate and which committee the contribution went through:-->
+```{r, include=FALSE}
+committeecontributionlist <- candcontjoin %>%
+  left_join( committeename, by = "cmte_id")
+```
+
+<!--Group by number of donations and amount of total donations to each committee to find aggregate donation statistics:-->
+```{r, include=FALSE}
+committeegroup <- committeecontributionlist %>%
+  group_by( cmte_name ) %>%
+  summarize( countofcontributions = n(), totaltransaction = sum(transaction_amt))
+committeegroup[is.na(committeegroup)] <- 0
+```
+
+<!--Group the number of Democratic donations and amount of total Democratic donations to each committee:-->
+```{r, include=FALSE}
+demcommittee <- committeecontributionlist %>%
+  filter(cand_party_affiliation == "DEM") %>%
+  group_by(cmte_name)%>%
+  summarize( countofdem = n())
+```
+
+<!--Group the number of Republican donations and amount of total Republican donations to each committee:-->
+```{r, include=FALSE}
+repcommittee <- committeecontributionlist %>%
+  filter(cand_party_affiliation == "REP") %>%
+  group_by(cmte_name)%>%
+  summarize( countofrep = n())
+```
+
+<!--Join the Democratic and Republican donations into one table to track the amount of Democratic and Republican contributions to each committee:-->
+```{r, include = FALSE}
+committeebyparty <- demcommittee %>%
+  full_join( repcommittee, by = "cmte_name") 
+committeebyparty[is.na(committeebyparty)] <- 0
+```
+
+<!--Create a graph to check the join-function is working properly by creating a "count" variable:-->
+```{r, include=FALSE}
+committeebypartycheck <-committeebyparty %>%
+  full_join( committeegroup, by = "cmte_name") %>%
+  mutate( check = countofcontributions - (countofdem + countofrep)) 
+```
+
+
+<!--Find the percent of total donors and donations that supported a Republican or Democratic candidate for each committee:-->
+```{r, include=FALSE}
+committeebypartyfinal <-committeebyparty %>%
+  full_join( committeegroup, by = "cmte_name") %>%
+  mutate( Democratic = (countofdem / countofcontributions) * 100) %>%
+  mutate( Republican = (countofrep / countofcontributions) * 100) %>%
+  mutate( party = ifelse( Democratic > Republican, "D", "R")) %>%
+  mutate( party = ifelse( Democratic == Republican, "Neutral", party)) %>%
+  mutate( totalperc = Democratic + Republican) %>%
+  rename( CommitteeName = cmte_name)
+```
+
+<!--Create a table of the Largest Committees:-->
+```{r, include=FALSE}
+largestcommittee <- committeebypartyfinal %>%
+  arrange(desc(totaltransaction))%>%
+  head(10)
+```
+
+<!--Code that changes the all caps letters into words that have the first letter capitalized, found here: https://stat.ethz.ch/R-manual/R-devel/library/base/html/chartr.html:-->
+```{r, include= FALSE}
+capwords <- function(s, strict = FALSE) {
+    cap <- function(s) paste(toupper(substring(s, 1, 1)),
+                  {s <- substring(s, 2); if(strict) tolower(s) else s},
+                             sep = "", collapse = " " )
+    sapply(strsplit(s, split = " "), cap, USE.NAMES = !is.null(names(s)))
+}
+```
+    
+<!--Code that takes the list of top 10 Committee Names, changes the list from all capitalized, splits the list, and makes the list a new column in the Largest Committee dataframe.---> 
+```{r, include= FALSE}
+committeelist <- as.character(largestcommittee$Committee)
+committeelistcap <- capwords(c("NATIONAL ASSOCIATION OF REALTORS POLITICAL ACTION COMMITTEE, NATIONAL BEER WHOLESALERS ASSOCIATION POLITICAL ACTION COMMITTEE, DEALERS ELECTION ACTION COMMITTEE OF THE NATIONAL AUTOMOTIVE DEALERS ASSOCIATION, HONEYWELL INTERNATIONAL POLITICAL ACTION COMMITTEE, AMERICAN BANKERS ASSOCIATION PAC (BANKPAC), ENGINEERS POLITICAL EDUCATION COMMITTEE (EPEC)/INTERNATIONAL UNION OF OPERATING ENGINEERS, AT&T INC. FEDERAL POLITICAL ACTION COMMITTEE (AT&T FEDERAL PAC), INTERNATIONAL BROTHERHOOD OF ELECTRICAL WORKERS POLITICAL ACTION COMMITTEE, CULAC THE PAC OF CREDIT UNION NATIONAL ASSOCIATION, AMERICAN FEDERATION OF STATE COUNTY & MUNICIPAL EMPLOYEES  PEOPLE"), strict = TRUE)
+committeelistcap
+comnamelist <- as.list(strsplit(committeelistcap, ","))
+largestcommittee$Committee <- comnamelist[[1]]
+```
+
+## To Fund a Campaign in America You Need Two Things...
+### A Donation and a Committee. 
+
+Committees are organizations that pool together campaign contributions and donate those funds to campaigns. The largest committees are called Super PACs (PAC = Political Action Committee), and have millions of dollars worth of campaign funding flowing in and out each year. 
+
+Often, Super PACs are hesitant to define their party affiliation, and so we tracked the funds coming into these massive committees in 2012, which party the funds were affiliated with, and charted the Top 10 Largest Super PACs in the US to see which side of the political spectrum they are more likely to support. Hover over the barchart to see this graphic come to life:
+
+<!--Create a plotly graph that charts the percent of each large committee that was supportive of a Republican or Democratic candidate:-->
+```{r, echo=FALSE, message=FALSE}
+largestcommitteeclean <- largestcommittee %>%
+  select(Committee, Republican, Democratic)
+mlargestcommittee <- melt(largestcommitteeclean, id= c("Committee"))
+mlargestcommittee <- mlargestcommittee %>%
+  rename(Party = variable) %>%
+  rename(Percent = value)
+p <- ggplot(mlargestcommittee, aes( x= Committee, Percent, fill = Party)) +
+  geom_bar(position = "fill", stat = "identity") +
+  scale_fill_manual(values=c("firebrick","royalblue4"),
+                    name="Party\nAffliation") +
+  scale_y_continuous(labels = percent) +
+  theme(axis.text.x=element_blank()) +
+  labs(title= "Party Affiliation of Largest US Committees", y ="Percentage", x = "Top 10 Largest Committees")
+p <- ggplotly(p)
+p
+``` 
+
+
+
+<!---Coding Sources:
+https://stat.ethz.ch/R-manual/R-devel/library/base/html/chartr.html
+http://www.cookbook-r.com/Graphs/Legends_(ggplot2)/
+https://plot.ly/ggplot2/geom_bar/
+https://stackoverflow.com/questions/35090883/remove-all-of-x-axis-labels-in-ggplot
+https://stackoverflow.com/questions/24256044/comma-separated-string-to-list-in-r
+https://stackoverflow.com/questions/6693257/making-a-stacked-bar-plot-for-multiple-variables-ggplot2-in-r
+--->
+
+
+
+
+
+
+
+
+
+
+
