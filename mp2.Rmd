@@ -18,8 +18,15 @@ load("committees.rda")
 load("contributions.rda")
 ```
 
-
 ```{r}
+library(tidyverse)
+library(ggplot2)
+library(plotly)
+packageVersion('plotly')
+library(scales)
+```
+
+```{r} 
 library(tidyverse)
 glimpse(house_elections)
 ```
@@ -162,7 +169,8 @@ lapply(d, dup_fun2012)
  
 ```{r}
 cleancontributions <- contributions %>%
-  select(cmte_id, name, city, state, zip_code, transaction_amt, cand_id, tran_id) 
+  select(cmte_id, name, city, state, zip_code, transaction_amt, cand_id, tran_id, transaction_type) %>%
+  filter( transaction_type == "24K")
 cleancandidates <- candidates %>%
   filter( cand_election_yr == 2012, cand_status == "C") %>%
   select(cand_id, cand_name, cand_party_affiliation, cand_election_yr, cand_office_state, cand_office, cand_status, cand_city, cand_state, cand_zip)
@@ -185,7 +193,7 @@ committeename <- committees %>%
 
 ```{r}
 committeecontributionlist <- candcontjoin %>%
-  full_join( committeename, by = "cmte_id")
+  left_join( committeename, by = "cmte_id")
 ```
 
 
@@ -233,8 +241,38 @@ Find the percent of total donors that were either Rep or Dem:
 ```{r}
 committeebypartyfinal <-committeebyparty %>%
   full_join( committeegroup, by = "cmte_name") %>%
-  mutate( percentdem = (countofdem / countofcontributions) * 100) %>%
-  mutate( pecentrep = (countofrep / countofcontributions) * 100) 
+  mutate( Democratic = (countofdem / countofcontributions) * 100) %>%
+  mutate( Republican = (countofrep / countofcontributions) * 100) %>%
+  mutate( party = ifelse( Democratic > Republican, "D", "R")) %>%
+  mutate( party = ifelse( Democratic == Republican, "Neutral", party)) %>%
+  mutate( totalperc = Democratic + Republican) %>%
+  rename( Committee = cmte_name)
 ```
+
+Largest Committees:
+```{r}
+largestcommittee <- committeebypartyfinal %>%
+  arrange(desc(totaltransaction))%>%
+  head(10)
+```
+
+       
+```{r}
+largestcommitteeclean <- largestcommittee %>%
+  select(Committee, Republican, Democratic)
+mlargestcommittee <- melt(largestcommitteeclean, id= c("Committee"))
+p <- ggplot(mlargestcommittee, aes( x= Committee, value, fill = variable)) +
+  geom_bar(position = "fill", stat = "identity") +
+  scale_fill_manual(values=c("firebrick","royalblue4"),
+                    name="Party\nAffliation") +
+  scale_y_continuous(labels = percent) +
+  theme(axis.text.x=element_blank()) +
+  labs(title= "Party Affiliation of Largest US Committees", y ="Percentage", x = "Top 10 Largest Committees")
+p <- ggplotly(p)
+p
+```
+
+
+
 
 
